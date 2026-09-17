@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local Link Converter</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body {
+      background: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 28px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      text-align: center;
+      margin-bottom: 6px;
+      color: #38bdf8;
+    }
+
+    p.subtitle {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin-bottom: 20px;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    label {
+      font-size: 0.8rem;
+      color: #cbd5e1;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: #fff;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    input:focus, select:focus {
+      border-color: #38bdf8;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #38bdf8;
+      color: #0f172a;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0ea5e9;
+    }
+
+    .result-box {
+      display: none;
+      margin-top: 20px;
+      padding: 14px;
+      background: #0f172a;
+      border-radius: 6px;
+      border: 1px solid #334155;
+    }
+
+    .result-box.active {
+      display: block;
+    }
+
+    .result-header {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+
+    .result-content {
+      display: flex;
+      gap: 8px;
+    }
+
+    .result-url {
+      flex: 1;
+      padding: 8px;
+      background: #1e293b;
+      border-radius: 4px;
+      color: #38bdf8;
+      font-size: 0.85rem;
+      word-break: break-all;
+    }
+
+    .btn-copy {
+      padding: 8px 12px;
+      background: #334155;
+      color: #fff;
+      width: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Link Converter</h1>
+    <p class="subtitle">Convert, format, or route links through a custom gateway</p>
+
+    <form id="link-form" onsubmit="return false;">
+      <div class="input-group">
+        <label for="url-input">Target Link</label>
+        <input type="text" id="url-input" placeholder="phantomcore.minicdn.store/" required>
+      </div>
+
+      <div class="input-group">
+        <label for="mode-select">Action</label>
+        <select id="mode-select">
+          <option value="gateway">Route Through Gateway Endpoint</option>
+          <option value="clean">Clean Tracking Parameters (?utm=...)</option>
+          <option value="utm">Add Standard UTM Campaign Tags</option>
+          <option value="format">Ensure Valid HTTPS Link</option>
+        </select>
+      </div>
+
+      <div class="input-group" id="gateway-group">
+        <label for="gateway-input">Gateway Server Prefix</label>
+        <input type="text" id="gateway-input" placeholder="https://my-gateway.com/fetch?url=" value="https://my-gateway.com/fetch?url=">
+      </div>
+
+      <button type="button" id="convert-btn">Convert Link</button>
+    </form>
+
+    <div class="result-box" id="result-box">
+      <div class="result-header">Converted Output:</div>
+      <div class="result-content">
+        <div class="result-url" id="result-url"></div>
+        <button class="btn-copy" id="copy-btn">Copy</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const convertBtn = document.getElementById('convert-btn');
+    const urlInput = document.getElementById('url-input');
+    const modeSelect = document.getElementById('mode-select');
+    const gatewayGroup = document.getElementById('gateway-group');
+    const gatewayInput = document.getElementById('gateway-input');
+    const resultBox = document.getElementById('result-box');
+    const resultUrl = document.getElementById('result-url');
+    const copyBtn = document.getElementById('copy-btn');
+
+    // Show or hide the Gateway Prefix input depending on selected mode
+    modeSelect.addEventListener('change', () => {
+      gatewayGroup.style.display = modeSelect.value === 'gateway' ? 'flex' : 'none';
+    });
+
+    convertBtn.addEventListener('click', () => {
+      let raw = urlInput.value.trim();
+      if (!raw) return;
+
+      if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)) {
+        raw = 'https://' + raw;
+      }
+
+      try {
+        const parsed = new URL(raw);
+        const mode = modeSelect.value;
+        let finalOutput = parsed.toString();
+
+        if (mode === 'gateway') {
+          const gatewayBase = gatewayInput.value.trim();
+          finalOutput = gatewayBase + encodeURIComponent(parsed.toString());
+        } else if (mode === 'clean') {
+          parsed.search = '';
+          finalOutput = parsed.toString();
+        } else if (mode === 'utm') {
+          parsed.searchParams.set('utm_source', 'converter');
+          parsed.searchParams.set('utm_medium', 'web');
+          finalOutput = parsed.toString();
+        }
+
+        resultUrl.textContent = finalOutput;
+        resultBox.classList.add('active');
+      } catch (e) {
+        alert('Invalid link format. Please check the text entered.');
+      }
+    });
+
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(resultUrl.textContent);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => copyBtn.textContent = 'Copy', 1500);
+    });
+  </script>
+</body>
+</html>
